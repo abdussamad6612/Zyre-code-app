@@ -24,8 +24,11 @@ router.post("/billing/checkout", async (req: Request, res: Response) => {
       return res.status(503).json({ error: `Stripe price ID not configured for plan ${planId}` });
     }
     const token = req.headers.authorization?.replace("Bearer ", "");
-    const session = token ? getSession(token) : null;
-    const userId = session?.userId || "unknown";
+    const authSession = token ? await getSession(token) : null;
+    if (!authSession) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+    const userId = authSession.userId;
     const stripeSession = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
       line_items: [{ price: priceId, quantity: 1 }],
@@ -45,17 +48,19 @@ router.post("/billing/checkout", async (req: Request, res: Response) => {
 
 router.post("/billing/portal", async (req: Request, res: Response) => {
   try {
-    const { clerkId, returnUrl } = req.body;
-    if (!clerkId) {
-      return res.status(400).json({ error: "clerkId is required" });
-    }
+    const { returnUrl } = req.body;
     if (!stripe) {
       return res.status(503).json({ error: "Stripe not configured" });
+    }
+    const token = req.headers.authorization?.replace("Bearer ", "");
+    const authSession = token ? await getSession(token) : null;
+    if (!authSession) {
+      return res.status(401).json({ error: "Authentication required" });
     }
     if (!convex) {
       return res.status(503).json({ error: "Convex not configured" });
     }
-    const customer = await (convex as any).query("stripe:getCustomerByClerkId", { clerkId }).catch(() => null);
+    const customer = await (convex as any).query("stripe:getCustomerByClerkId", { clerkId: authSession.userId }).catch(() => null);
     if (!customer?.stripeCustomerId) {
       return res.status(404).json({ error: "No Stripe customer found for this user" });
     }
@@ -72,14 +77,16 @@ router.post("/billing/portal", async (req: Request, res: Response) => {
 
 router.post("/billing/check-limit", async (req: Request, res: Response) => {
   try {
-    const { clerkId } = req.body;
-    if (!clerkId) {
-      return res.status(400).json({ canSend: false, reason: "Missing clerkId", billingMode: "tokens", remaining: 0 });
+    const token = req.headers.authorization?.replace("Bearer ", "");
+    const authSession = token ? await getSession(token) : null;
+    if (!authSession) {
+      return res.json({ canSend: false, reason: "Not authenticated", billingMode: "tokens", remaining: 0 });
     }
+    const userId = authSession.userId;
     if (!convex) {
       return res.json({ canSend: true, reason: "Convex not configured", billingMode: "tokens", remaining: -1 });
     }
-    const result = await (convex as any).query("billingSwitch:canSendMessage", { clerkId }).catch(() => null);
+    const result = await (convex as any).query("billingSwitch:canSendMessage", { clerkId: userId }).catch(() => null);
     if (!result) {
       return res.json({ canSend: true, reason: "Unable to check limit", billingMode: "tokens", remaining: -1 });
     }

@@ -71,13 +71,14 @@ export async function createSessionAction(params: {
   message: string;
   templateId?: string;
   repository?: any;
-  userId: string;
+  userId?: string;
   token?: string;
 }): Promise<void> {
+  const { userId: _unused, token: _unusedToken, ...rest } = params;
   const res = await fetch(`${API_BASE}/create-session`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify(params),
+    body: JSON.stringify(rest),
   });
   if (!res.ok) {
     const data = await res.json();

@@ -16,11 +16,15 @@ async function requireAuth(req: any, res: any): Promise<{ userId: string; github
 
 router.post("/create-session", async (req, res) => {
   try {
-    const { sessionId, message, templateId, repository, userId } = req.body;
+    const { sessionId, message, templateId, repository } = req.body;
 
-    if (!sessionId || !userId) {
-      return res.status(400).json({ error: "sessionId and userId are required" });
+    if (!sessionId) {
+      return res.status(400).json({ error: "sessionId is required" });
     }
+
+    const caller = await requireAuth(req, res);
+    if (!caller) return;
+    const userId = caller.userId;
 
     const template = getTemplate(templateId);
     if (!template) {
