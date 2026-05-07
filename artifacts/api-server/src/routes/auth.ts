@@ -1,9 +1,10 @@
 import { Router } from "express";
 import crypto from "crypto";
+import { db, authSessionsTable } from "@workspace/db";
+import { eq, lt } from "drizzle-orm";
 
 const router = Router();
 
-const sessions = new Map<string, { userId: string; token: string; username: string; expiresAt: number }>();
 const oauthStates = new Map<string, number>();
 
 function generateToken() {
@@ -15,6 +16,12 @@ function cleanExpiredStates() {
   for (const [state, ts] of oauthStates.entries()) {
     if (now - ts > 10 * 60 * 1000) oauthStates.delete(state);
   }
+}
+
+async function cleanExpiredSessions() {
+  try {
+    await db.delete(authSessionsTable).where(lt(authSessionsTable.expiresAt, Date.now()));
+  } catch { }
 }
 
 router.get("/auth/github", (req, res) => {
@@ -59,12 +66,18 @@ router.get("/auth/github/callback", async (req, res) => {
     });
     const user = await userRes.json() as any;
     const sessionToken = generateToken();
-    sessions.set(sessionToken, {
+    const expiresAt = Date.now() + 7 * 24 * 60 * 60 * 1000;
+    await db.insert(authSessionsTable).values({
+      token: sessionToken,
       userId: String(user.id),
-      token: accessToken,
+      githubToken: accessToken,
       username: user.login,
-      expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000,
+      expiresAt,
+    }).onConflictDoUpdate({
+      target: authSessionsTable.token,
+      set: { userId: String(user.id), githubToken: accessToken, username: user.login, expiresAt },
     });
+    cleanExpiredSessions().catch(() => { });
     const frontendUrl = process.env.APP_URL || "";
     res.redirect(`${frontendUrl}/?token=${sessionToken}&username=${user.login}`);
   } catch (err) {
@@ -73,35 +86,48 @@ router.get("/auth/github/callback", async (req, res) => {
   }
 });
 
-router.get("/auth/session", (req, res) => {
+router.get("/auth/session", async (req, res) => {
   const token = req.headers.authorization?.replace("Bearer ", "") || (req.query.token as string);
   if (!token) {
     return res.json({ user: null });
   }
-  const session = sessions.get(token);
-  if (!session || session.expiresAt < Date.now()) {
-    sessions.delete(token || "");
-    return res.json({ user: null });
+  try {
+    const rows = await db.select().from(authSessionsTable).where(eq(authSessionsTable.token, token));
+    const session = rows[0];
+    if (!session || session.expiresAt < Date.now()) {
+      if (session) await db.delete(authSessionsTable).where(eq(authSessionsTable.token, token)).catch(() => { });
+      return res.json({ user: null });
+    }
+    res.json({
+      user: {
+        id: session.userId,
+        username: session.username,
+        name: session.username,
+      },
+    });
+  } catch (err) {
+    console.error("auth/session error:", err);
+    res.status(500).json({ user: null });
   }
-  res.json({
-    user: {
-      id: session.userId,
-      username: session.username,
-      name: session.username,
-    },
-  });
 });
 
-router.post("/auth/signout", (req, res) => {
+router.post("/auth/signout", async (req, res) => {
   const token = req.headers.authorization?.replace("Bearer ", "");
-  if (token) sessions.delete(token);
+  if (token) {
+    await db.delete(authSessionsTable).where(eq(authSessionsTable.token, token)).catch(() => { });
+  }
   res.json({ success: true });
 });
 
-export function getSession(token: string) {
-  const s = sessions.get(token);
-  if (!s || s.expiresAt < Date.now()) return null;
-  return s;
+export async function getSession(token: string) {
+  try {
+    const rows = await db.select().from(authSessionsTable).where(eq(authSessionsTable.token, token));
+    const s = rows[0];
+    if (!s || s.expiresAt < Date.now()) return null;
+    return { userId: s.userId, token: s.githubToken, username: s.username, expiresAt: s.expiresAt };
+  } catch {
+    return null;
+  }
 }
 
 export default router;

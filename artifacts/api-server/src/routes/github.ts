@@ -153,4 +153,58 @@ router.get("/github/status", async (req, res) => {
   }
 });
 
+router.post("/github/create-pull-request", async (req, res) => {
+  try {
+    const { sessionId, repository, title, body } = req.body;
+    if (!sessionId || !repository) {
+      return res.status(400).json({ success: false, error: "sessionId and repository are required" });
+    }
+    const token = req.headers.authorization?.replace("Bearer ", "");
+    if (!token) return res.status(401).json({ success: false, error: "Authentication required" });
+    const { getSession } = await import("./auth");
+    const session = await getSession(token);
+    if (!session) return res.status(401).json({ success: false, error: "Invalid session" });
+    const [owner, repo] = repository.split("/");
+    if (!owner || !repo) {
+      return res.status(400).json({ success: false, error: "repository must be in owner/repo format" });
+    }
+    const octokit = new Octokit({ auth: session.token });
+    const repoData = await octokit.rest.repos.get({ owner, repo });
+    const defaultBranch = repoData.data.default_branch;
+    const pr = await octokit.rest.pulls.create({
+      owner,
+      repo,
+      title: title || "VibraCode: AI generated changes",
+      body: body || "This pull request was created automatically by VibraCode AI.",
+      head: "vibracode-changes",
+      base: defaultBranch,
+    });
+    const { db, appSessionsTable } = await import("@workspace/db");
+    const { eq } = await import("drizzle-orm");
+    await db.update(appSessionsTable)
+      .set({ pullRequestUrl: pr.data.html_url, pullRequestNumber: pr.data.number })
+      .where(eq(appSessionsTable.id, sessionId));
+    res.json({ success: true, html_url: pr.data.html_url, number: pr.data.number });
+  } catch (err: any) {
+    console.error("github/create-pull-request error:", err);
+    res.status(500).json({ success: false, error: err?.message || "Internal server error" });
+  }
+});
+
+router.post("/github/clear-session", async (req, res) => {
+  try {
+    const { sessionId } = req.body;
+    if (!sessionId) return res.status(400).json({ success: false, error: "sessionId is required" });
+    const { db, appSessionsTable } = await import("@workspace/db");
+    const { eq } = await import("drizzle-orm");
+    await db.update(appSessionsTable)
+      .set({ pullRequestUrl: null, pullRequestNumber: null, repository: null })
+      .where(eq(appSessionsTable.id, sessionId));
+    res.json({ success: true });
+  } catch (err) {
+    console.error("github/clear-session error:", err);
+    res.status(500).json({ success: false, error: "Internal server error" });
+  }
+});
+
 export default router;

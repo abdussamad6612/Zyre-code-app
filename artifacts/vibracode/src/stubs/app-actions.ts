@@ -51,9 +51,19 @@ export async function runAgentAction(params: {
   }
 }
 
-export async function createPullRequestAction(..._args: any[]): Promise<null> {
-  console.warn("createPullRequestAction: not implemented");
-  return null;
+export async function createPullRequestAction(params: {
+  sessionId: string;
+  repository: string;
+  title?: string;
+  body?: string;
+}): Promise<{ html_url: string; number: number } | null> {
+  const res = await fetch(`${API_BASE}/github/create-pull-request`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(params),
+  });
+  if (!res.ok) return null;
+  return res.json();
 }
 
 export async function createSessionAction(params: {
@@ -126,7 +136,12 @@ export async function disconnectGitHub(clerkId: string): Promise<any> {
   return res.json();
 }
 
-export async function clearSessionGitHub(..._args: any[]): Promise<null> {
-  console.warn("clearSessionGitHub: not implemented");
-  return null;
+export async function clearSessionGitHub(params: { sessionId: string }): Promise<any> {
+  const res = await fetch(`${API_BASE}/github/clear-session`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(params),
+  });
+  if (!res.ok) return null;
+  return res.json();
 }
