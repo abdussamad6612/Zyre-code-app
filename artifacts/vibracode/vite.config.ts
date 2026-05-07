@@ -9,6 +9,8 @@ const port = rawPort ? Number(rawPort) : 5173;
 
 const basePath = process.env.BASE_PATH || "/";
 
+const stubs = path.resolve(import.meta.dirname, "src/stubs");
+
 export default defineConfig({
   base: basePath,
   plugins: [
@@ -33,20 +35,35 @@ export default defineConfig({
     alias: {
       "@": path.resolve(import.meta.dirname, "src"),
       "@assets": path.resolve(import.meta.dirname, "..", "..", "attached_assets"),
-      "convex/react": path.resolve(import.meta.dirname, "src/stubs/convex.ts"),
-      "convex/nextjs": path.resolve(import.meta.dirname, "src/stubs/convex.ts"),
-      "@/convex/_generated/api": path.resolve(import.meta.dirname, "src/stubs/convex-api.ts"),
-      "@/convex/_generated/dataModel": path.resolve(import.meta.dirname, "src/stubs/convex-data-model.ts"),
-      "@clerk/nextjs": path.resolve(import.meta.dirname, "src/stubs/clerk.ts"),
-      "@clerk/nextjs/server": path.resolve(import.meta.dirname, "src/stubs/clerk.ts"),
-      "@/app/actions/stripe/create-checkout-session": path.resolve(import.meta.dirname, "src/stubs/app-actions.ts"),
-      "@/app/actions/stripe/create-customer-portal-session": path.resolve(import.meta.dirname, "src/stubs/app-actions.ts"),
-      "@/app/actions/vibrakit": path.resolve(import.meta.dirname, "src/stubs/app-actions.ts"),
-      "@/app/actions/github-push": path.resolve(import.meta.dirname, "src/stubs/app-actions.ts"),
-      "@/app/actions/agents": path.resolve(import.meta.dirname, "src/stubs/app-actions.ts"),
-      "@/app/actions/sessions/create-convex-project": path.resolve(import.meta.dirname, "src/stubs/app-actions.ts"),
-      "@/app/actions/featurebase/generate-user-hash": path.resolve(import.meta.dirname, "src/stubs/app-actions.ts"),
-      "@/lib/inngest": path.resolve(import.meta.dirname, "src/stubs/inngest.ts"),
+
+      // Convex
+      "convex/react": `${stubs}/convex.ts`,
+      "convex/nextjs": `${stubs}/convex.ts`,
+      "@/convex/_generated/api": `${stubs}/convex-api.ts`,
+      "@/convex/_generated/dataModel": `${stubs}/convex-data-model.ts`,
+
+      // Clerk
+      "@clerk/nextjs": `${stubs}/clerk.ts`,
+      "@clerk/nextjs/server": `${stubs}/clerk.ts`,
+
+      // Next.js navigation
+      "next/navigation": `${stubs}/next-navigation.ts`,
+      "next/server": `${stubs}/next-server.ts`,
+      "next/headers": `${stubs}/next-server.ts`,
+
+      // App actions — all map to unified stubs
+      "@/app/actions/stripe/create-checkout-session": `${stubs}/app-actions.ts`,
+      "@/app/actions/stripe/create-customer-portal-session": `${stubs}/app-actions.ts`,
+      "@/app/actions/vibrakit": `${stubs}/app-actions.ts`,
+      "@/app/actions/github-push": `${stubs}/app-actions.ts`,
+      "@/app/actions/agents": `${stubs}/app-actions.ts`,
+      "@/app/actions/sessions/create-convex-project": `${stubs}/app-actions.ts`,
+      "@/app/actions/featurebase/generate-user-hash": `${stubs}/app-actions.ts`,
+      "@/app/actions/session": `${stubs}/app-actions.ts`,
+      "@/app/actions/github": `${stubs}/github.ts`,
+
+      // Inngest
+      "@/lib/inngest": `${stubs}/inngest.ts`,
     },
     dedupe: ["react", "react-dom"],
   },

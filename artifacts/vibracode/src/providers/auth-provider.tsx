@@ -26,6 +26,13 @@ const AuthContext = createContext<AuthContextType>({
   signOut: () => {},
 });
 
+function broadcastAuth(state: { user: AuthUser | null; isSignedIn: boolean; isLoaded: boolean }) {
+  try {
+    (window as any).__vibra_auth = state;
+    window.dispatchEvent(new Event("vibra_auth_change"));
+  } catch {}
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isSignedIn, setIsSignedIn] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -34,7 +41,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const tokenFromUrl = urlParams.get("token");
-    const usernameFromUrl = urlParams.get("username");
     if (tokenFromUrl) {
       localStorage.setItem(SESSION_TOKEN_KEY, tokenFromUrl);
       const newUrl = new URL(window.location.href);
@@ -46,6 +52,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const token = tokenFromUrl || localStorage.getItem(SESSION_TOKEN_KEY);
     if (!token) {
       setIsLoaded(true);
+      broadcastAuth({ user: null, isSignedIn: false, isLoaded: true });
       return;
     }
 
@@ -55,18 +62,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .then((r) => r.json())
       .then((data) => {
         if (data.user) {
-          setUser({
+          const u: AuthUser = {
             id: data.user.id,
             name: data.user.name || data.user.username || "User",
             username: data.user.username,
-          });
+            email: data.user.email,
+          };
+          setUser(u);
           setIsSignedIn(true);
+          broadcastAuth({ user: u, isSignedIn: true, isLoaded: true });
         } else {
           localStorage.removeItem(SESSION_TOKEN_KEY);
+          broadcastAuth({ user: null, isSignedIn: false, isLoaded: true });
         }
       })
       .catch(() => {
         localStorage.removeItem(SESSION_TOKEN_KEY);
+        broadcastAuth({ user: null, isSignedIn: false, isLoaded: true });
       })
       .finally(() => {
         setIsLoaded(true);
@@ -88,6 +100,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     setIsSignedIn(false);
     setUser(null);
+    broadcastAuth({ user: null, isSignedIn: false, isLoaded: true });
   };
 
   return (

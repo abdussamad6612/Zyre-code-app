@@ -6,6 +6,7 @@ import githubRouter from "./github";
 import billingRouter from "./billing";
 import webhooksRouter from "./webhooks";
 import inngestRouter from "./inngest";
+import extrasRouter from "./extras";
 
 const router: IRouter = Router();
 
@@ -16,5 +17,6 @@ router.use(githubRouter);
 router.use(billingRouter);
 router.use(webhooksRouter);
 router.use(inngestRouter);
+router.use(extrasRouter);
 
 export default router;

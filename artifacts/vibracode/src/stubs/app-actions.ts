@@ -146,3 +146,13 @@ export async function clearSessionGitHub(params: { sessionId: string }): Promise
   if (!res.ok) return null;
   return res.json();
 }
+
+
+export async function generateSessionTitle(message: string): Promise<string> {
+  const words = message.trim().split(/\s+/).slice(0, 8).join(" ");
+  return words.length > 50 ? words.slice(0, 50) + "..." : words;
+}
+
+export async function getGitHubConnection(): Promise<any> {
+  return null;
+}
