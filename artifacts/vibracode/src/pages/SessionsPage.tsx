@@ -1,17 +1,20 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
 import { Input } from '@/components/ui/input';
 import { Search, Code } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import { FeatureCard } from '@/components/ui/grid-feature-cards';
 import { CustomLoader } from '@/components/ui/custom-loader';
 import { useLocation } from 'wouter';
-import { useAuth } from '@/providers/auth-provider';
+import { useAuth, getSessionToken } from '@/providers/auth-provider';
+
+const API_BASE = (import.meta as any).env?.VITE_API_URL || "/api";
 
 interface Session {
   id: string;
   name: string;
   _creationTime: number;
+  status?: string;
+  templateId?: string;
 }
 
 type ViewAnimationProps = {
@@ -39,13 +42,32 @@ function AnimatedContainer({ className, delay = 0.1, children }: ViewAnimationPr
 }
 
 export default function SessionsPage() {
-  const { isSignedIn } = useAuth();
+  const { isSignedIn, user } = useAuth();
   const [, navigate] = useLocation();
   const [searchQuery, setSearchQuery] = useState('');
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Stub sessions - real app would fetch from Convex
-  const sessions: Session[] = [];
-  const isLoading = false;
+  useEffect(() => {
+    if (!isSignedIn || !user) return;
+    const token = getSessionToken();
+    if (!token) return;
+
+    setIsLoading(true);
+    fetch(`${API_BASE}/sessions`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(r => r.ok ? r.json() : { sessions: [] })
+      .then(data => {
+        if (Array.isArray(data.sessions)) {
+          setSessions(data.sessions);
+        } else if (Array.isArray(data)) {
+          setSessions(data);
+        }
+      })
+      .catch(() => setSessions([]))
+      .finally(() => setIsLoading(false));
+  }, [isSignedIn, user]);
 
   const filteredSessions = useMemo(() => {
     return sessions.filter((session) =>
@@ -117,7 +139,7 @@ export default function SessionsPage() {
             >
               <FeatureCard
                 feature={{
-                  title: session.name,
+                  title: session.name || `Session ${session.id.slice(0, 8)}`,
                   icon: Code,
                   description: `Created: ${formatDate(session._creationTime)}`
                 }}
@@ -134,9 +156,18 @@ export default function SessionsPage() {
               {searchQuery
                 ? "No sessions found matching your search."
                 : isSignedIn
-                  ? "No sessions found. Create your first session to get started!"
+                  ? "No sessions yet. Create your first app from the home page!"
                   : "Sign in to view your sessions."}
             </p>
+            {!isSignedIn && (
+              <motion.a
+                href="/"
+                className="mt-4 inline-block px-6 py-2 rounded-lg bg-primary text-primary-foreground text-sm"
+                whileHover={{ scale: 1.05 }}
+              >
+                Go Home
+              </motion.a>
+            )}
           </AnimatedContainer>
         )}
       </div>

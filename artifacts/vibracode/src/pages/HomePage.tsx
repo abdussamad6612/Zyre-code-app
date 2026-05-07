@@ -7,10 +7,10 @@ import { HeroWave } from "@/components/ui/ai-input-hero";
 import { Footer } from "@/components/ui/footer";
 import { templates } from "@/config";
 import { useAuth } from "@/providers/auth-provider";
+import { createSessionAction } from "@/stubs/app-actions";
 
 const PENDING_PROMPT_KEY = "vibra_pending_prompt";
 
-// Stub for Repo type
 interface Repo {
   full_name: string;
 }
@@ -19,6 +19,7 @@ export default function HomePage() {
   const { isSignedIn, isLoaded, user } = useAuth();
   const [isSignInOpen, setIsSignInOpen] = useState(false);
   const [initialPrompt, setInitialPrompt] = useState<string>("");
+  const [isCreating, setIsCreating] = useState(false);
   const [, navigate] = useLocation();
   const hasCheckedPendingPrompt = useRef(false);
 
@@ -55,14 +56,31 @@ export default function HomePage() {
   ];
 
   const handleChatSubmit = useCallback(async (message: string, repository?: Repo, imageData?: any, templateId?: string) => {
-    if (!isSignedIn) {
+    if (!isSignedIn || !user) {
       localStorage.setItem(PENDING_PROMPT_KEY, message);
       setIsSignInOpen(true);
       return;
     }
-    // Navigate to a placeholder session page (real backend would create session)
-    navigate("/sessions");
-  }, [isSignedIn, navigate]);
+
+    const sessionId = crypto.randomUUID();
+    const template = templates.find(t => t.id === templateId) || templates[0];
+
+    setIsCreating(true);
+    try {
+      await createSessionAction({
+        sessionId,
+        message,
+        templateId: template?.id || "expo",
+        repository: repository ? { name: repository.full_name } : undefined,
+        userId: user.id,
+      });
+    } catch (err) {
+      console.error("Failed to create session:", err);
+    } finally {
+      setIsCreating(false);
+    }
+    navigate(`/session/${sessionId}`);
+  }, [isSignedIn, user, navigate]);
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -76,7 +94,7 @@ export default function HomePage() {
           title="Create your next mobile masterpiece"
           subtitle="The AI Mobile App Builder. Create iOS and Android apps instantly"
           placeholder="Describe the mobile app you want to create..."
-          buttonText="Build Mobile App"
+          buttonText={isCreating ? "Creating..." : "Build Mobile App"}
           onPromptSubmit={handleChatSubmit}
           initialPrompt={initialPrompt}
         />

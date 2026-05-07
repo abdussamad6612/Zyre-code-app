@@ -1,7 +1,18 @@
 import { Router } from "express";
 import { inngest } from "../lib/inngest";
+import { getSession } from "./auth";
 
 const router = Router();
+
+const sessionStore = new Map<string, {
+  id: string;
+  name: string;
+  userId: string;
+  status: string;
+  _creationTime: number;
+  messages: any[];
+  previewUrl?: string;
+}>();
 
 router.post("/create-session", async (req, res) => {
   try {
@@ -16,22 +27,57 @@ router.post("/create-session", async (req, res) => {
       return res.status(400).json({ error: `Template "${templateId}" not found` });
     }
 
-    await inngest.send({
-      name: "vibracode/create.session",
-      data: {
-        sessionId,
-        message,
-        repository,
-        token: token || "",
-        template,
-      },
+    sessionStore.set(sessionId, {
+      id: sessionId,
+      name: message ? message.slice(0, 60) : `Session ${sessionId.slice(0, 8)}`,
+      userId,
+      status: "creating",
+      _creationTime: Date.now(),
+      messages: [],
     });
+
+    try {
+      await inngest.send({
+        name: "vibracode/create.session",
+        data: {
+          sessionId,
+          message,
+          repository,
+          token: token || "",
+          template,
+        },
+      });
+      const stored = sessionStore.get(sessionId);
+      if (stored) stored.status = "active";
+    } catch (inngestErr) {
+      console.warn("Inngest not configured, session stored locally");
+      const stored = sessionStore.get(sessionId);
+      if (stored) stored.status = "active";
+    }
 
     res.json({ success: true, sessionId, message: "Session creation started" });
   } catch (err) {
     console.error("create-session error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
+});
+
+router.get("/sessions", (req, res) => {
+  const token = req.headers.authorization?.replace("Bearer ", "");
+  if (!token) return res.status(401).json({ sessions: [] });
+  const session = getSession(token);
+  if (!session) return res.status(401).json({ sessions: [] });
+  const userSessions = Array.from(sessionStore.values())
+    .filter(s => s.userId === session.userId)
+    .sort((a, b) => b._creationTime - a._creationTime);
+  res.json({ sessions: userSessions });
+});
+
+router.get("/sessions/:id", (req, res) => {
+  const { id } = req.params;
+  const s = sessionStore.get(id);
+  if (!s) return res.status(404).json({ error: "Session not found" });
+  res.json(s);
 });
 
 router.post("/run-agent", async (req, res) => {
@@ -47,18 +93,19 @@ router.post("/run-agent", async (req, res) => {
       return res.status(400).json({ error: "No template found" });
     }
 
-    await inngest.send({
-      name: "vibracode/run.agent",
-      data: {
-        sessionId,
-        id,
-        message,
-        template,
-        repository,
-        token: token || "",
-        model,
-      },
-    });
+    const s = sessionStore.get(sessionId);
+    if (s) {
+      s.messages.push({ id, role: "user", content: message, createdAt: Date.now() });
+    }
+
+    try {
+      await inngest.send({
+        name: "vibracode/run.agent",
+        data: { sessionId, id, message, template, repository, token: token || "", model },
+      });
+    } catch (inngestErr) {
+      console.warn("Inngest not configured for run-agent");
+    }
 
     res.json({ success: true, sessionId, message: "Agent started" });
   } catch (err) {
@@ -103,7 +150,7 @@ router.post("/generate-video", async (req, res) => {
 
 router.post("/generate-image", async (req, res) => {
   try {
-    const { prompt, size = "1024x1024", quality = "auto", background = "transparent", outputFormat = "png" } = req.body;
+    const { prompt, size = "1024x1024", quality = "auto" } = req.body;
     if (!prompt) {
       return res.status(400).json({ error: "Prompt is required" });
     }

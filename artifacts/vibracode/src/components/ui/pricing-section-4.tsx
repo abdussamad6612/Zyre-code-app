@@ -46,7 +46,7 @@ export default function PricingSection6() {
 
   const handlePlanSelect = async (planId: string) => {
     if (!isSignedIn) {
-      window.location.href = "/sign-in";
+      window.location.href = "/billing";
       return;
     }
     try {
