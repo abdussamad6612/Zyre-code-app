@@ -4,20 +4,30 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "export NODE_ENV=development && pnpm run build && pnpm run start",
+    "dev": "node ./build.mjs && node --enable-source-maps ./dist/index.mjs",
     "build": "node ./build.mjs",
     "start": "node --enable-source-maps ./dist/index.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@auth/express": "^0.12.2",
+    "@inngest/realtime": "^0.4.7",
+    "@octokit/rest": "^22.0.1",
+    "@opentelemetry/api": "^1.9.1",
     "@workspace/api-zod": "workspace:*",
     "@workspace/db": "workspace:*",
+    "convex": "^1.37.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2",
     "drizzle-orm": "catalog:",
     "express": "^5",
+    "express-session": "^1.19.0",
+    "inngest": "^4.3.0",
+    "next-auth": "^4.24.14",
     "pino": "^9",
-    "pino-http": "^10"
+    "pino-http": "^10",
+    "stripe": "^22.1.0",
+    "svix": "^1.92.2"
   },
   "devDependencies": {
     "@types/cookie-parser": "^1.4.10",
