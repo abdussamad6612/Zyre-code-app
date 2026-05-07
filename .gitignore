@@ -1,68 +1,49 @@
-# Environment
-.env
-.env.*
-!.env.example
+# See https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files for more about ignoring files.
 
-# Keys and secrets (root and backend only - Expo test fixtures are OK)
-/*.pem
-/vibracode-backend/*.pem
-*.key
-!vibracode-mobile/packages/**/certificates/**/*.pem
-!vibracode-mobile/packages/**/fixtures/**/*.pem
-!vibracode-mobile/apps/**/expo-root.pem
-*.p12
-*.p8
-*_SECRET*
-credentials.json
+# compiled output
+dist
+tmp
+out-tsc
+*.tsbuildinfo
+.expo
+.expo-shared
 
-# Dependencies
-node_modules/
+# dependencies
+node_modules
 
-# Build outputs
-.next/
-build/
-dist/
-DerivedData/
-*.xcarchive
+# IDEs and editors
+/.idea
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
 
-# iOS
-Pods/
-*.ipa
+# IDE - VSCode
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
 
-# System
+# misc
+/.sass-cache
+/connect.lock
+/coverage
+/libpeerconnection.log
+npm-debug.log
+yarn-error.log
+testem.log
+/typings
+
+# System Files
 .DS_Store
 Thumbs.db
 
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
+.cursor/rules/nx-rules.mdc
+.github/instructions/nx.instructions.md
 
-# AI tool configs
-.auto-claude/
-.auto-claude-security.json
-.claude/
-.claude_settings.json
-.cursor/
-.windsurf/
-copilot/
-
-# Deployment / CI (remove for your own repo)
-.vercel/
-.github/
-.netlify/
-
-# Provisioning & signing (regenerate your own)
-*.mobileprovision
-*.certSigningRequest
-
-# Secrets directory
-secrets/
-
-# Misc
-*.log
-*.tmp
-.expo/
-__pycache__/
-*.pyc
+# Replit
+.cache/
+.local/

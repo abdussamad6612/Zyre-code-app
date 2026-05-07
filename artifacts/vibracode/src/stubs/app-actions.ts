@@ -1,0 +1,12 @@
+export async function createStripeCheckoutSessionAction(...args: any[]) { return null; }
+export async function createStripeCustomerPortalSessionAction(...args: any[]) { return null; }
+export async function runAgentAction(...args: any[]) { return null; }
+export async function createPullRequestAction(...args: any[]) { return null; }
+export async function createSessionAction(...args: any[]) { return null; }
+export async function generateFeaturebaseUserHash(...args: any[]) { return ''; }
+export async function checkGitHubConnection(...args: any[]) { return null; }
+export async function createAndPushToGitHub(...args: any[]) { return null; }
+export async function generateRepoName(...args: any[]) { return ''; }
+export async function retryGitHubPush(...args: any[]) { return null; }
+export async function disconnectGitHub(...args: any[]) { return null; }
+export async function clearSessionGitHub(...args: any[]) { return null; }
