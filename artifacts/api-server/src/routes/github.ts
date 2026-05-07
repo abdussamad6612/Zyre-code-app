@@ -162,13 +162,21 @@ router.post("/github/create-pull-request", async (req, res) => {
     const token = req.headers.authorization?.replace("Bearer ", "");
     if (!token) return res.status(401).json({ success: false, error: "Authentication required" });
     const { getSession } = await import("./auth");
-    const session = await getSession(token);
-    if (!session) return res.status(401).json({ success: false, error: "Invalid session" });
+    const authSession = await getSession(token);
+    if (!authSession) return res.status(401).json({ success: false, error: "Invalid session" });
+
+    const { db, appSessionsTable } = await import("@workspace/db");
+    const { eq } = await import("drizzle-orm");
+    const rows = await db.select().from(appSessionsTable).where(eq(appSessionsTable.id, sessionId));
+    const appSession = rows[0];
+    if (!appSession) return res.status(404).json({ success: false, error: "Session not found" });
+    if (appSession.userId !== authSession.userId) return res.status(403).json({ success: false, error: "Forbidden" });
+
     const [owner, repo] = repository.split("/");
     if (!owner || !repo) {
       return res.status(400).json({ success: false, error: "repository must be in owner/repo format" });
     }
-    const octokit = new Octokit({ auth: session.token });
+    const octokit = new Octokit({ auth: authSession.token });
     const repoData = await octokit.rest.repos.get({ owner, repo });
     const defaultBranch = repoData.data.default_branch;
     const pr = await octokit.rest.pulls.create({
@@ -179,8 +187,6 @@ router.post("/github/create-pull-request", async (req, res) => {
       head: "vibracode-changes",
       base: defaultBranch,
     });
-    const { db, appSessionsTable } = await import("@workspace/db");
-    const { eq } = await import("drizzle-orm");
     await db.update(appSessionsTable)
       .set({ pullRequestUrl: pr.data.html_url, pullRequestNumber: pr.data.number })
       .where(eq(appSessionsTable.id, sessionId));
@@ -195,8 +201,19 @@ router.post("/github/clear-session", async (req, res) => {
   try {
     const { sessionId } = req.body;
     if (!sessionId) return res.status(400).json({ success: false, error: "sessionId is required" });
+    const token = req.headers.authorization?.replace("Bearer ", "");
+    if (!token) return res.status(401).json({ success: false, error: "Authentication required" });
+    const { getSession } = await import("./auth");
+    const authSession = await getSession(token);
+    if (!authSession) return res.status(401).json({ success: false, error: "Invalid session" });
+
     const { db, appSessionsTable } = await import("@workspace/db");
     const { eq } = await import("drizzle-orm");
+    const rows = await db.select().from(appSessionsTable).where(eq(appSessionsTable.id, sessionId));
+    const appSession = rows[0];
+    if (!appSession) return res.status(404).json({ success: false, error: "Session not found" });
+    if (appSession.userId !== authSession.userId) return res.status(403).json({ success: false, error: "Forbidden" });
+
     await db.update(appSessionsTable)
       .set({ pullRequestUrl: null, pullRequestNumber: null, repository: null })
       .where(eq(appSessionsTable.id, sessionId));
