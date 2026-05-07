@@ -144,7 +144,11 @@ router.post("/check-url", async (req, res) => {
     } else {
       validUrl = url;
     }
-    new URL(validUrl);
+    const parsed = new URL(validUrl);
+    const blocked = ["localhost", "127.0.0.1", "0.0.0.0", "::1"];
+    if (blocked.includes(parsed.hostname)) {
+      return res.status(403).json({ available: false, error: "URL not allowed" });
+    }
   } catch {
     return res.status(400).json({ available: false, error: "Invalid URL format" });
   }
@@ -161,17 +165,27 @@ router.get("/preview-proxy", async (req, res) => {
   if (!url) {
     return res.status(400).json({ error: "URL parameter required" });
   }
+  let targetUrl: URL;
   try {
-    const targetUrl = new URL(url);
-    const allowedPatterns = [/\.e2b\.dev$/, /\.northflank\.app$/, /localhost/, /127\.0\.0\.1/];
-    if (!allowedPatterns.some((p) => p.test(targetUrl.hostname))) {
-      return res.status(403).json({ error: "URL not allowed" });
-    }
+    targetUrl = new URL(url);
+  } catch {
+    return res.status(400).json({ error: "Invalid URL" });
+  }
+  const blocked = ["localhost", "127.0.0.1", "0.0.0.0", "::1"];
+  if (blocked.includes(targetUrl.hostname)) {
+    return res.status(403).json({ error: "URL not allowed" });
+  }
+  const allowedPatterns = [/\.e2b\.dev$/, /\.northflank\.app$/];
+  if (!allowedPatterns.some((p) => p.test(targetUrl.hostname))) {
+    return res.status(403).json({ error: "URL not in allowlist" });
+  }
+  try {
     const upstream = await fetch(url, {
       headers: {
         "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15",
         Accept: "text/html,application/xhtml+xml,*/*",
       },
+      signal: AbortSignal.timeout(10000),
     });
     const text = await upstream.text();
     res.set("Content-Type", upstream.headers.get("content-type") || "text/html");

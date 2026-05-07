@@ -2,17 +2,18 @@ import { Router, type Request, type Response } from "express";
 import { stripe } from "../lib/stripe";
 import { convex } from "../lib/convex";
 import { getPlanConfig, getStripePriceId } from "../lib/plans";
+import { getSession } from "./auth";
 
 const router = Router();
 
 router.post("/billing/checkout", async (req: Request, res: Response) => {
   try {
-    const { clerkId, planId, successUrl, cancelUrl } = req.body;
-    if (!clerkId || !planId) {
-      return res.status(400).json({ error: "clerkId and planId are required" });
+    const { planId, successUrl, cancelUrl } = req.body;
+    if (!planId) {
+      return res.status(400).json({ error: "planId is required" });
     }
     if (!stripe) {
-      return res.status(503).json({ error: "Stripe not configured" });
+      return res.status(503).json({ error: "Stripe not configured — add STRIPE_SECRET_KEY to enable payments" });
     }
     const plan = getPlanConfig(planId);
     if (!plan || plan.price === 0) {
@@ -22,17 +23,20 @@ router.post("/billing/checkout", async (req: Request, res: Response) => {
     if (!priceId) {
       return res.status(503).json({ error: `Stripe price ID not configured for plan ${planId}` });
     }
-    const session = await stripe.checkout.sessions.create({
+    const token = req.headers.authorization?.replace("Bearer ", "");
+    const session = token ? getSession(token) : null;
+    const userId = session?.userId || "unknown";
+    const stripeSession = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
       line_items: [{ price: priceId, quantity: 1 }],
       mode: "subscription",
       success_url: successUrl || `${process.env.APP_URL}/billing/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: cancelUrl || `${process.env.APP_URL}/billing/cancel`,
       allow_promotion_codes: true,
-      metadata: { clerkId, planId },
-      subscription_data: { metadata: { clerkId, planId } },
+      metadata: { userId, planId },
+      subscription_data: { metadata: { userId, planId } },
     });
-    res.json({ url: session.url });
+    res.json({ url: stripeSession.url });
   } catch (err) {
     console.error("billing/checkout error:", err);
     res.status(500).json({ error: "Failed to create checkout session" });

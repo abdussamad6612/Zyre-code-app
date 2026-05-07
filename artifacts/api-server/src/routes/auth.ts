@@ -4,9 +4,17 @@ import crypto from "crypto";
 const router = Router();
 
 const sessions = new Map<string, { userId: string; token: string; username: string; expiresAt: number }>();
+const oauthStates = new Map<string, number>();
 
 function generateToken() {
   return crypto.randomBytes(32).toString("hex");
+}
+
+function cleanExpiredStates() {
+  const now = Date.now();
+  for (const [state, ts] of oauthStates.entries()) {
+    if (now - ts > 10 * 60 * 1000) oauthStates.delete(state);
+  }
 }
 
 router.get("/auth/github", (req, res) => {
@@ -14,17 +22,23 @@ router.get("/auth/github", (req, res) => {
   if (!clientId) {
     return res.status(503).json({ error: "GitHub OAuth not configured" });
   }
+  cleanExpiredStates();
   const state = crypto.randomBytes(16).toString("hex");
+  oauthStates.set(state, Date.now());
   const redirectUri = `${process.env.APP_URL || ""}/api/auth/github/callback`;
   const url = `https://github.com/login/oauth/authorize?client_id=${clientId}&scope=repo+read:user&state=${state}&redirect_uri=${encodeURIComponent(redirectUri)}`;
   res.redirect(url);
 });
 
 router.get("/auth/github/callback", async (req, res) => {
-  const { code } = req.query as { code: string };
+  const { code, state } = req.query as { code: string; state: string };
   if (!code) {
     return res.status(400).json({ error: "Missing code" });
   }
+  if (!state || !oauthStates.has(state)) {
+    return res.status(400).json({ error: "Invalid or expired OAuth state" });
+  }
+  oauthStates.delete(state);
   try {
     const tokenRes = await fetch("https://github.com/login/oauth/access_token", {
       method: "POST",

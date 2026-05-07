@@ -10,8 +10,7 @@ import { useRef, useState } from "react";
 import { getPaidPlans } from "@/lib/plans";
 import { CustomLoader } from "./custom-loader";
 import { useAuth } from "@/providers/auth-provider";
-import { Button } from "@/components/ui/button";
-import { Settings } from "lucide-react";
+import { createStripeCheckoutSessionAction } from "@/stubs/app-actions";
 
 const PricingSwitch = ({ onSwitch }: { onSwitch: (value: string) => void }) => {
   const [selected, setSelected] = useState("0");
@@ -47,10 +46,14 @@ export default function PricingSection6() {
 
   const handlePlanSelect = async (planId: string) => {
     if (!isSignedIn) {
-      alert("Please sign in to subscribe to a plan.");
+      window.location.href = "/sign-in";
       return;
     }
-    alert(`Stripe integration required to subscribe to plan: ${planId}`);
+    try {
+      await createStripeCheckoutSessionAction(planId);
+    } catch (err: any) {
+      console.error("Checkout error:", err);
+    }
   };
 
   if (!paidPlans || paidPlans.length === 0) {
